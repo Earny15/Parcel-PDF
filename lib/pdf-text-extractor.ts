@@ -1,14 +1,15 @@
-import * as pdfjsLib from 'pdfjs-dist'
-
-// Configure PDF.js worker
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`
-}
-
 export class PDFTextExtractor {
   async extractTextFromPDF(file: File): Promise<string> {
     try {
       console.log('PDF Text Extractor - Starting text extraction from PDF:', file.name)
+      
+      // Dynamic import to avoid webpack bundling issues
+      const pdfjsLib = await import('pdfjs-dist')
+      
+      // Configure PDF.js worker
+      if (typeof window !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`
+      }
       
       const arrayBuffer = await file.arrayBuffer()
       const uint8Array = new Uint8Array(arrayBuffer)
