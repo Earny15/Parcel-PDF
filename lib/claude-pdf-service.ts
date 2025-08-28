@@ -27,22 +27,23 @@ export class ClaudePDFService {
     try {
       console.log('Starting PDF extraction for file:', file.name, 'Size:', file.size, 'Type:', file.type)
       
-      // For PDF files, extract text first
+      // For PDF files, ALWAYS use text extraction approach
       if (file.type === 'application/pdf') {
-        console.log('PDF detected - extracting text content...')
+        console.log('PDF detected - using PDF text extraction approach (NOT vision models)...')
         try {
           const extractedText = await this.pdfExtractor.extractTextFromPDF(file)
           console.log('PDF text extracted successfully, length:', extractedText.length)
           
-          // Use text analysis instead of vision
+          // Use text analysis with Claude 3 Haiku
           return await this.analyzeTextWithClaude(extractedText, extractionPrompt)
         } catch (textError) {
-          console.warn('PDF text extraction failed, falling back to base64 vision approach:', textError)
-          // Continue with original approach if text extraction fails
+          console.error('PDF text extraction failed:', textError)
+          throw new Error(`PDF text extraction failed: ${textError.message}`)
         }
       }
       
-      console.log('Using base64 vision approach...')
+      // Only use vision approach for image files
+      console.log('Image file detected - using vision model approach...')
       console.log('Converting file to base64...')
       const base64Data = await this.fileToBase64(file)
       console.log('Base64 conversion completed, length:', base64Data.length)

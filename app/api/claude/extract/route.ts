@@ -35,7 +35,7 @@ function generateEnhancedMockData(base64Data: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Claude API route called')
+    console.log('Claude vision API route called')
     
     if (!CLAUDE_API_KEY) {
       console.error('Claude API key not configured on server')
@@ -51,6 +51,15 @@ export async function POST(request: NextRequest) {
     if (!base64Data || !mimeType) {
       return NextResponse.json(
         { error: 'Missing required fields: base64Data, mimeType' },
+        { status: 400 }
+      )
+    }
+
+    // If it's a PDF file, don't try vision models - return error to use text extraction instead
+    if (mimeType === 'application/pdf') {
+      console.log('PDF file detected - vision route should not be used for PDFs')
+      return NextResponse.json(
+        { error: 'PDF files should use text extraction route, not vision route' },
         { status: 400 }
       )
     }
