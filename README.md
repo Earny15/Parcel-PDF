@@ -24,7 +24,7 @@ A Next.js application for courier companies to upload Electronic Proof of Delive
 
 ### Prerequisites
 - Node.js 18+ and pnpm
-- Claude API key (optional - system works with enhanced mock data)
+- Claude API key (required for real PDF extraction - system works with enhanced mock data without it)
 
 ### Installation
 
