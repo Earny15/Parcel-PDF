@@ -9,53 +9,82 @@ export class OCRService {
 
   async extractDataFromFile(file: File): Promise<any> {
     try {
+      console.log('OCR Service - Starting extraction for file:', file.name, 'Type:', file.type)
+      
       // Check if it's a PDF file or image
       if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
-        const extractedData = await this.claudeService.extractDataFromPDF(file)
+        console.log('OCR Service - File type supported, calling Claude service...')
         
-        // Normalize the response to ensure consistent field names
-        return this.normalizeExtractedData(extractedData)
+        const extractedData = await this.claudeService.extractDataFromPDF(file)
+        console.log('OCR Service - Raw data received from Claude service:', extractedData)
+        
+        // Check if we got real data or mock data
+        if (extractedData && typeof extractedData === 'object') {
+          console.log('OCR Service - Data received, normalizing...')
+          const normalizedData = this.normalizeExtractedData(extractedData)
+          console.log('OCR Service - Final normalized data:', normalizedData)
+          return normalizedData
+        } else {
+          console.error('OCR Service - No valid data received from Claude service')
+          throw new Error('No valid data received from extraction service')
+        }
       }
 
-      // Fallback to mock data for other file types
-      return this.generateMockData()
+      // No support for other file types - throw error
+      console.error('OCR Service - Unsupported file type:', file.type)
+      throw new Error(`Unsupported file type: ${file.type}. Only PDF files and images are supported.`)
     } catch (error) {
-      console.error('OCR extraction failed:', error)
-      // Return mock data if extraction fails
-      return this.generateMockData()
+      console.error('OCR extraction failed with error:', error)
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        fileName: file.name,
+        fileType: file.type
+      })
+      // Only return mock data for actual failures, not for debugging
+      throw error // Re-throw the error instead of silently falling back
     }
   }
 
   private normalizeExtractedData(data: any): any {
     console.log('OCR Service - normalizing data from API:', data)
     
-    // Ensure all expected fields are present with proper names
+    // NO DUMMY DATA - Only use actual extracted data
     const normalized = {
-      // Basic document data
-      docketNumber: data.docketNumber || data.awbNumber || this.generateDocketNumber(),
-      awbNumber: data.awbNumber || data.docketNumber || this.generateDocketNumber(),
-      invoiceNumber: data.invoiceNumber || this.generateInvoiceNumber(),
-      ewayBillNumber: data.ewayBillNumber || this.generateEwayBillNumber(),
+      // Basic document data - only use real extracted values
+      docketNumber: data.docketNumber || data.awbNumber || null,
+      awbNumber: data.awbNumber || data.docketNumber || null,
+      invoiceNumber: data.invoiceNumber || null,
+      ewayBillNumber: data.ewayBillNumber || null,
       
-      // Receiver information
-      receiverName: data.receiverName || data.consigneeName || this.getRandomReceiverName(),
-      receiverAddress: data.receiverAddress || this.getRandomReceiverAddress(),
+      // Receiver information - only real data
+      receiverName: data.receiverName || data.consigneeName || null,
+      receiverAddress: data.receiverAddress || null,
       
-      // Package details
-      numberOfBoxes: data.numberOfBoxes || Math.floor(Math.random() * 5) + 1,
-      actualWeight: data.actualWeight || `${(Math.random() * 50 + 1).toFixed(1)} kg`,
+      // Package details - only real data
+      numberOfBoxes: data.numberOfBoxes || null,
+      actualWeight: data.actualWeight || null,
       
-      // Status fields
-      signatureStatus: data.signatureStatus || this.getRandomSignatureStatus(),
-      stampStatus: data.stampStatus || this.getRandomStampStatus(),
-      signaturePresent: data.signatureStatus === 'Signature Present' || Math.random() > 0.3,
+      // Status fields - only real data
+      signatureStatus: data.signatureStatus || null,
+      stampStatus: data.stampStatus || null,
+      signaturePresent: data.signatureStatus === 'Signature Present',
       
-      // Damage comments
-      damageComments: data.damageComments || (Math.random() > 0.8 ? 'Minor packaging damage noted' : ''),
+      // Damage comments - only real data
+      damageComments: data.damageComments || null,
       
-      // Legacy fields for backward compatibility
-      consignorName: data.consignorName || this.getRandomConsignor(),
-      consigneeName: data.consigneeName || data.receiverName || this.getRandomConsignee()
+      // Legacy fields for backward compatibility - only real data
+      consignorName: data.consignorName || null,
+      consigneeName: data.consigneeName || data.receiverName || null
+    }
+    
+    // Check if we have ANY real data, if not throw error
+    const hasRealData = Object.values(normalized).some(value => 
+      value !== null && value !== undefined && value !== ''
+    )
+    
+    if (!hasRealData) {
+      throw new Error('No meaningful data extracted from document. All fields are empty/null.')
     }
     
     console.log('OCR Service - normalized data output:', normalized)

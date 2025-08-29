@@ -3,35 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 const CLAUDE_API_KEY = process.env.NEXT_PUBLIC_CLAUDE_API_KEY
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages'
 
-// Enhanced mock data generator for when vision models are not available
-function generateEnhancedMockData(base64Data: string) {
-  console.log('Generating enhanced mock data for RIVIGO document simulation')
-  
-  // Simulate realistic RIVIGO document data
-  const mockData = {
-    docketNumber: "3001823710",
-    invoiceNumber: "255231699",
-    ewayBillNumber: "851526271123", 
-    receiverName: "NDG Motors Private Limited",
-    numberOfBoxes: 85,
-    actualWeight: "222 kg",
-    receiverAddress: "H No - 6, Ground Floor, Bab Shop Area, R.road, Jharkhana - 831001",
-    signatureStatus: "Signature Present",
-    stampStatus: "Available",
-    damageComments: "Package received in good condition",
-    consignorName: "Eicher Motors Limited",
-    consignorAddress: "Royal Enfield, 39 Hide Road, Near Jainkunj Maidan Kolkata, West Bengal - 700043",
-    deliveryDate: "May 13, 2025",
-    gstin: "19AAACE3882D1ZP"
-  }
-  
-  return NextResponse.json({ 
-    success: true, 
-    data: mockData,
-    note: "Vision models not available - using enhanced mock data for RIVIGO document",
-    recommendation: "For real PDF extraction, upgrade to Claude API key with vision model access"
-  })
-}
+// Mock data function REMOVED - No more dummy data fallbacks
 
 export async function POST(request: NextRequest) {
   try {
@@ -109,12 +81,10 @@ Return only the JSON object with extracted data.
 
     const requestPrompt = prompt || defaultPrompt
 
-    // First, try vision-capable models
+    // Try available models (based on API key test results)
     const visionModels = [
-      'claude-3-5-sonnet-20241022', 
-      'claude-3-5-sonnet-20240620',
-      'claude-3-sonnet-20240229',
-      'claude-3-opus-20240229'
+      'claude-3-5-haiku-20241022', // Available with your API key - might have vision
+      'claude-3-haiku-20240307'    // Available with your API key - text only
     ]
     
     console.log('Attempting vision-capable models first...')
@@ -170,10 +140,17 @@ Return only the JSON object with extracted data.
       }
     }
     
-    // If vision models failed, return enhanced mock data based on filename
+    // If vision models failed, throw error - NO mock data fallback
     if (!visionWorked) {
-      console.log('Vision models not available, using enhanced mock data')
-      return generateEnhancedMockData(base64Data)
+      console.error('All vision models failed - cannot process image files')
+      return NextResponse.json(
+        { 
+          error: 'Vision model extraction failed', 
+          details: 'All Claude vision models are unavailable. Cannot process image files without vision capabilities.',
+          recommendation: 'Use PDF files with text content instead of image files, or check Claude API key permissions.'
+        },
+        { status: 503 }
+      )
     }
 
     console.log('Claude API response status:', claudeResponse.status)

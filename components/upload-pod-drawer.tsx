@@ -109,109 +109,160 @@ export function UploadPODDrawer({ open, onOpenChange, onPODComplete, deliveredPa
       for (const file of uploadedFiles) {
         console.log(`Processing file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`)
         
-        // Extract data from file using OCR
-        const extractedData = await ocrService.extractDataFromFile(file)
-        console.log('Raw extracted data from OCR:', extractedData)
-        console.log('Extracted data fields:', {
-          docketNumber: extractedData.docketNumber,
-          awbNumber: extractedData.awbNumber,
-          receiverName: extractedData.receiverName,
-          receiverAddress: extractedData.receiverAddress,
-          signatureStatus: extractedData.signatureStatus,
-          stampStatus: extractedData.stampStatus,
-          actualWeight: extractedData.actualWeight,
-          numberOfBoxes: extractedData.numberOfBoxes,
-          invoiceNumber: extractedData.invoiceNumber,
-          ewayBillNumber: extractedData.ewayBillNumber
-        })
-        
-        // Extract LR number from filename
-        const lrFromFilename = extractLRNumberFromFileName(file.name)
-        console.log(`LR number from filename '${file.name}':`, lrFromFilename)
-        
-        // Also try to extract LR from the document content
-        const lrFromDocument = extractedData.docketNumber || extractedData.awbNumber
-        console.log('LR number from document:', lrFromDocument)
-        
-        // Find matching parcel by LR number with enhanced matching
-        const matchingParcel = deliveredParcels.find(parcel => {
-          const candidates = [lrFromFilename, lrFromDocument].filter(Boolean)
-          
-          for (const candidate of candidates) {
-            if (
-              parcel.lrNumber === candidate || 
-              parcel.id === candidate ||
-              parcel.orderId === candidate ||
-              // Also check if parcel ID/LR contains the extracted number
-              parcel.lrNumber?.includes(candidate) ||
-              parcel.id?.includes(candidate) ||
-              // Check reverse - if candidate contains parcel identifiers
-              (parcel.lrNumber && candidate.includes(parcel.lrNumber)) ||
-              (parcel.id && candidate.includes(parcel.id))
-            ) {
-              return true
-            }
-          }
-          return false
-        })
-
-        console.log('Matching parcel found:', matchingParcel ? matchingParcel.id : 'None')
-
-        if (matchingParcel) {
-          // Update existing parcel with extracted data
-          const updatedParcel = {
-            ...matchingParcel,
-            // Map AWB Number from docket number or awbNumber field
-            awbNumber: extractedData.awbNumber || extractedData.docketNumber,
-            signatureStatus: extractedData.signatureStatus || (extractedData.signaturePresent ? "Signature Present" : "Signature Not Present"),
-            stampStatus: extractedData.stampStatus || "Available",
-            recipientName: extractedData.receiverName || extractedData.consigneeName,
-            recipientAddress: extractedData.receiverAddress,
+        try {
+          // Extract data from file using OCR
+          console.log('Calling OCR service for file:', file.name)
+          const extractedData = await ocrService.extractDataFromFile(file)
+          console.log('✅ Real extracted data from OCR:', extractedData)
+          console.log('Extracted data fields:', {
+            docketNumber: extractedData.docketNumber,
+            awbNumber: extractedData.awbNumber,
+            receiverName: extractedData.receiverName,
+            receiverAddress: extractedData.receiverAddress,
+            signatureStatus: extractedData.signatureStatus,
+            stampStatus: extractedData.stampStatus,
             actualWeight: extractedData.actualWeight,
             numberOfBoxes: extractedData.numberOfBoxes,
             invoiceNumber: extractedData.invoiceNumber,
-            ewayBillNumber: extractedData.ewayBillNumber,
-            damageComments: extractedData.damageComments || '',
-            // Additional tracking fields
-            podProcessed: true,
-            podFileName: file.name,
-            podProcessedAt: new Date().toISOString(),
-            // Keep original data for reference
-            originalData: {
-              consignorName: extractedData.consignorName,
-              consigneeName: extractedData.consigneeName || extractedData.receiverName,
-              docketNumber: extractedData.docketNumber
-            }
-          }
-          
-          console.log('About to update parcel with data:', {
-            id: updatedParcel.id,
-            awbNumber: updatedParcel.awbNumber,
-            signatureStatus: updatedParcel.signatureStatus,
-            stampStatus: updatedParcel.stampStatus,
-            recipientName: updatedParcel.recipientName,
-            recipientAddress: updatedParcel.recipientAddress,
-            actualWeight: updatedParcel.actualWeight,
-            numberOfBoxes: updatedParcel.numberOfBoxes,
-            podProcessed: updatedParcel.podProcessed
+            ewayBillNumber: extractedData.ewayBillNumber
           })
           
-          updatedParcels.push(updatedParcel)
-          onParcelUpdate(updatedParcel)
-          console.log(`Updated parcel ${updatedParcel.id} with POD data`)
-          console.log('Final updated parcel object:', updatedParcel)
-        } else {
-          console.warn(`No matching parcel found for file: ${file.name} (LR candidates: ${[lrFromFilename, lrFromDocument].filter(Boolean).join(', ')})`)
-        }
+          // Extract LR number from filename
+          const lrFromFilename = extractLRNumberFromFileName(file.name)
+          console.log(`LR number from filename '${file.name}':`, lrFromFilename)
+          
+          // Also try to extract LR from the document content
+          const lrFromDocument = extractedData.docketNumber || extractedData.awbNumber
+          console.log('LR number from document:', lrFromDocument)
+          
+          // Find matching parcel by LR number with enhanced matching
+          const matchingParcel = deliveredParcels.find(parcel => {
+            const candidates = [lrFromFilename, lrFromDocument].filter(Boolean)
+            
+            for (const candidate of candidates) {
+              if (
+                parcel.lrNumber === candidate || 
+                parcel.id === candidate ||
+                parcel.orderId === candidate ||
+                // Also check if parcel ID/LR contains the extracted number
+                parcel.lrNumber?.includes(candidate) ||
+                parcel.id?.includes(candidate) ||
+                // Check reverse - if candidate contains parcel identifiers
+                (parcel.lrNumber && candidate.includes(parcel.lrNumber)) ||
+                (parcel.id && candidate.includes(parcel.id))
+              ) {
+                return true
+              }
+            }
+            return false
+          })
 
-        results.push({
-          ...extractedData,
-          fileName: file.name,
-          lrFromFilename: lrFromFilename,
-          lrFromDocument: lrFromDocument,
-          matchedParcel: !!matchingParcel,
-          matchedParcelId: matchingParcel?.id || null
-        })
+          console.log('Matching parcel found:', matchingParcel ? matchingParcel.id : 'None')
+
+          if (matchingParcel) {
+            // Update existing parcel with extracted data
+            const updatedParcel = {
+              ...matchingParcel,
+              // Map AWB Number from docket number or awbNumber field
+              awbNumber: extractedData.awbNumber || extractedData.docketNumber,
+              signatureStatus: extractedData.signatureStatus || (extractedData.signaturePresent ? "Signature Present" : "Signature Not Present"),
+              stampStatus: extractedData.stampStatus || "Available",
+              recipientName: extractedData.receiverName || extractedData.consigneeName,
+              recipientAddress: extractedData.receiverAddress,
+              actualWeight: extractedData.actualWeight,
+              numberOfBoxes: extractedData.numberOfBoxes,
+              invoiceNumber: extractedData.invoiceNumber,
+              ewayBillNumber: extractedData.ewayBillNumber,
+              damageComments: extractedData.damageComments || '',
+              // Additional tracking fields
+              podProcessed: true,
+              podFileName: file.name,
+              podProcessedAt: new Date().toISOString(),
+              // Keep original data for reference
+              originalData: {
+                consignorName: extractedData.consignorName,
+                consigneeName: extractedData.consigneeName || extractedData.receiverName,
+                docketNumber: extractedData.docketNumber
+              }
+            }
+            
+            console.log('About to update parcel with data:', {
+              id: updatedParcel.id,
+              awbNumber: updatedParcel.awbNumber,
+              signatureStatus: updatedParcel.signatureStatus,
+              stampStatus: updatedParcel.stampStatus,
+              recipientName: updatedParcel.recipientName,
+              recipientAddress: updatedParcel.recipientAddress,
+              actualWeight: updatedParcel.actualWeight,
+              numberOfBoxes: updatedParcel.numberOfBoxes,
+              podProcessed: updatedParcel.podProcessed
+            })
+            
+            updatedParcels.push(updatedParcel)
+            onParcelUpdate(updatedParcel)
+            console.log(`✅ Updated parcel ${updatedParcel.id} with POD data`)
+            console.log('Final updated parcel object:', updatedParcel)
+          } else {
+            console.warn(`⚠️ No matching parcel found for file: ${file.name} (LR candidates: ${[lrFromFilename, lrFromDocument].filter(Boolean).join(', ')})`)
+          }
+
+          results.push({
+            ...extractedData,
+            fileName: file.name,
+            lrFromFilename: lrFromFilename,
+            lrFromDocument: lrFromDocument,
+            matchedParcel: !!matchingParcel,
+            matchedParcelId: matchingParcel?.id || null
+          })
+        } catch (fileError) {
+          console.error(`❌ Error processing file ${file.name}:`, fileError)
+          
+          // Show user-friendly error message based on error type
+          let userMessage = `❌ Failed to process ${file.name}:\n\n`
+          
+          if (fileError.message.includes('Only 4 characters extracted') || 
+              fileError.message.includes('Insufficient text extracted')) {
+            userMessage += `📄 This PDF appears to be image-based (scanned document) with no selectable text.
+            
+💡 Solutions:
+• Use a PDF with selectable/copyable text
+• Convert your scanned PDF using OCR software
+• Try uploading the document as a high-quality image instead
+
+🔍 Test: Try selecting text in your PDF with your cursor - if you can't select text, it's image-based.`
+          } else if (fileError.message.includes('Cannot process image files') ||
+                     fileError.message.includes('Vision models are not available')) {
+            userMessage += `📷 Image files require Claude Vision models, which are not available with your current API key.
+
+💡 Solutions:
+• Convert your image to a text-based PDF
+• Use OCR software to extract text from the image first
+• Upload a PDF with selectable text instead
+• Upgrade your Claude API key to access vision models
+
+📝 Note: The system can only process PDFs with extractable text, not image files.`
+          } else if (fileError.message.includes('PDF.js')) {
+            userMessage += `⚙️ PDF processing error: ${fileError.message}
+            
+💡 Try:
+• Using a different PDF file
+• Checking if the PDF is corrupted
+• Converting the PDF to a standard format`
+          } else {
+            userMessage += fileError.message
+          }
+          
+          alert(userMessage)
+          
+          // Add failed result to track the error
+          results.push({
+            fileName: file.name,
+            error: fileError.message,
+            extractionFailed: true,
+            matchedParcel: false,
+            matchedParcelId: null
+          })
+        }
       }
 
       console.log('Processing completed. Results:', results)
@@ -336,8 +387,10 @@ export function UploadPODDrawer({ open, onOpenChange, onPODComplete, deliveredPa
                     <h5 className="font-medium text-blue-900 mb-2">Processing Summary</h5>
                     <div className="text-sm text-blue-700">
                       <div>Files processed: {extractedData.length}</div>
-                      <div>Parcels updated: {extractedData.filter(r => r.matchedParcel).length}</div>
-                      <div>Unmatched files: {extractedData.filter(r => !r.matchedParcel).length}</div>
+                      <div className="text-green-700">✅ Successful extractions: {extractedData.filter(r => !r.extractionFailed).length}</div>
+                      <div className="text-red-700">❌ Failed extractions: {extractedData.filter(r => r.extractionFailed).length}</div>
+                      <div>Parcels updated: {extractedData.filter(r => r.matchedParcel && !r.extractionFailed).length}</div>
+                      <div>Unmatched files: {extractedData.filter(r => !r.matchedParcel && !r.extractionFailed).length}</div>
                     </div>
                   </div>
                 )}

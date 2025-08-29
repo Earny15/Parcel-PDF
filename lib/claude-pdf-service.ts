@@ -29,20 +29,34 @@ export class ClaudePDFService {
       
       // For PDF files, ALWAYS use text extraction approach
       if (file.type === 'application/pdf') {
-        console.log('PDF detected - using PDF text extraction approach (NOT vision models)...')
+        console.log('✅ PDF detected - using PDF text extraction approach (NOT vision models)...')
+        console.log('File details:', { name: file.name, type: file.type, size: file.size })
         try {
           const extractedText = await this.pdfExtractor.extractTextFromPDF(file)
-          console.log('PDF text extracted successfully, length:', extractedText.length)
+          console.log('✅ PDF text extracted successfully, length:', extractedText.length)
+          console.log('✅ Extracted text preview:', extractedText.substring(0, 200))
           
           // Use text analysis with Claude 3 Haiku
-          return await this.analyzeTextWithClaude(extractedText, extractionPrompt)
+          console.log('✅ Calling Claude text analysis...')
+          const result = await this.analyzeTextWithClaude(extractedText, extractionPrompt)
+          console.log('✅ PDF text extraction completed successfully, returning result:', result)
+          return result
         } catch (textError) {
-          console.error('PDF text extraction failed:', textError)
+          console.error('❌ PDF text extraction failed:', textError)
+          console.error('❌ STOPPING HERE - should NOT continue to vision API')
           throw new Error(`PDF text extraction failed: ${textError.message}`)
         }
       }
       
       // Only use vision approach for image files
+      console.log('📷 Image file detected:', file.type)
+      
+      if (file.type === 'application/pdf') {
+        console.error('🚨 SHOULD NOT REACH HERE FOR PDFs! File type:', file.type)
+        console.error('🚨 This indicates PDF text extraction failed or did not return properly')
+        throw new Error('PDF file incorrectly routed to vision API - PDF text extraction must have failed')
+      }
+      
       console.log('Image file detected - using vision model approach...')
       console.log('Converting file to base64...')
       const base64Data = await this.fileToBase64(file)
@@ -113,6 +127,20 @@ Return only the JSON object with extracted data.
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         console.error('Server API error:', response.status, errorData)
+        
+        // Provide specific error message for vision model failures with images
+        if (response.status === 503 && errorData.error?.includes('Vision model extraction failed')) {
+          throw new Error(`Cannot process image files: Claude Vision models are not available with your API key. 
+          
+Solutions:
+• Convert your image to a text-based PDF
+• Use a PDF with selectable text instead of an image
+• Upgrade your Claude API key to access vision models
+• Use OCR software to convert the image to text first
+
+Current file: ${file.type}`)
+        }
+        
         throw new Error(`Server API error: ${response.status} - ${errorData.error || 'Unknown error'}`)
       }
 
@@ -123,14 +151,14 @@ Return only the JSON object with extracted data.
         console.log('Extracted data from Claude:', result.data)
         return result.data
       } else {
-        console.warn('No data in response, using mock data')
-        return this.getMockPDFData()
+        console.error('No valid data in Claude API response:', result)
+        throw new Error(`Claude API returned invalid response: ${JSON.stringify(result)}`)
       }
 
     } catch (error) {
       console.error('Claude PDF processing failed:', error)
-      // Fallback to mock data if API fails
-      return this.getMockPDFData()
+      // NO fallback to mock data - throw the actual error
+      throw new Error(`Claude PDF processing failed: ${error.message}`)
     }
   }
 
@@ -239,14 +267,18 @@ Return only the JSON object with extracted data.
       if (response.ok) {
         const result = await response.json()
         console.log('Text analysis result:', result)
-        return result.success ? result.data : this.getMockPDFData()
+        if (result.success && result.data) {
+          return result.data
+        } else {
+          throw new Error(`Text analysis failed: ${JSON.stringify(result)}`)
+        }
       } else {
-        console.error('Text analysis failed:', response.status)
-        return this.getMockPDFData()
+        const errorText = await response.text()
+        throw new Error(`Text analysis API error: ${response.status} - ${errorText}`)
       }
     } catch (error) {
       console.error('Text analysis error:', error)
-      return this.getMockPDFData()
+      throw new Error(`Text analysis failed: ${error.message}`)
     }
   }
 

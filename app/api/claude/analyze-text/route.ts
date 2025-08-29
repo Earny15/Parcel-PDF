@@ -47,23 +47,51 @@ Analyze this text extracted from a courier/logistics delivery document and extra
 
 Instructions:
 - Extract information from the provided text
-- For docketNumber: Look for patterns like "DOCKET NUMBER", tracking numbers, AWB numbers
-- For addresses: Extract complete addresses with city and postal codes
-- For signatureStatus: Look for mentions of signatures, delivery confirmations
-- For stampStatus: Look for mentions of stamps, seals, official marks
-- For weights and quantities: Extract numeric values with units
-- If any field is not found in the text, use null or empty string
+- For docketNumber: Look for patterns like "DOCKET NUMBER", tracking numbers, AWB numbers, any long numeric sequences
+- If text is very short or minimal, try to extract any numeric patterns as potential tracking numbers
+- For addresses: Extract any address-like text patterns
+- For signatureStatus: Default to "Signature Not Clear" if not mentioned
+- For stampStatus: Default to "Not Clear" if not mentioned
+- Even with minimal text, try to extract meaningful data
+- If any field cannot be determined, use null
 - Return only the JSON object
 
-Here is the text to analyze:
+Here is the text to analyze (Text length: ${text.length} characters):
 
-${text}
+"${text}"
 `
 
     const requestPrompt = prompt || defaultPrompt
 
     console.log('Making Claude API request for text analysis...')
     console.log('Text length:', text.length)
+    console.log('🔍 Extracted text preview (first 500 chars):', text.substring(0, 500))
+    
+    // Check for key RIVIGO document indicators
+    const rivogoIndicators = [
+      'RIVIGO', 'DOCKET NUMBER', 'Eicher Motors', 'Invoice No', 'Eway Bill'
+    ]
+    const foundIndicators = rivogoIndicators.filter(indicator => 
+      text.toUpperCase().includes(indicator.toUpperCase())
+    )
+    console.log('🔍 RIVIGO indicators found:', foundIndicators)
+    
+    if (text.length < 50) {
+      console.error('❌ EXTRACTED TEXT TOO SHORT - PDF.js extraction likely failed')
+      console.error('❌ Expected RIVIGO document with docket 3001817837, invoice 256167254')
+      console.log('🔍 Text characters as array:', Array.from(text).map(c => `'${c}' (${c.charCodeAt(0)})`))
+      return NextResponse.json(
+        { 
+          error: 'Insufficient text extracted from PDF',
+          details: `Only ${text.length} characters extracted: "${text}". Expected rich RIVIGO document content.`,
+          recommendation: 'PDF.js failed to extract text properly. Check worker configuration or use different PDF processing.',
+          extractedText: text,
+          expectedIndicators: rivogoIndicators,
+          foundIndicators: foundIndicators
+        },
+        { status: 400 }
+      )
+    }
     
     const claudeResponse = await fetch(CLAUDE_API_URL, {
       method: 'POST',

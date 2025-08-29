@@ -41,20 +41,6 @@ export default function CourierDashboard() {
       transitTime: "1 day",
       status: "DELIVERED",
     },
-    {
-      id: "3001823710",
-      lrNumber: "3001823710",
-      orderId: "N/A",
-      carrier: "RIVIGO by Mahindra Logistics",
-      tags: [],
-      source: "Eicher Motors Limited",
-      sourceLocation: "Royal Enfield, 39 Hide Road, Near Jainkunj Maidan Kolkata, West Bengal - 700043",
-      destination: "NDG Motors Private Limited",
-      destinationLocation: "H No - 6, Ground Floor, Bab Shop Area, R.road, Jharkhana - 831001",
-      transitTime: "6 days",
-      status: "DELIVERED",
-      lrDate: "May 07, 2025"
-    },
   ])
 
   const [uploadDrawerOpen, setUploadDrawerOpen] = useState(false)
